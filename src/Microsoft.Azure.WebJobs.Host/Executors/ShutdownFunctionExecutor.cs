@@ -19,8 +19,7 @@ namespace Microsoft.Azure.WebJobs.Host.Executors
 
         public async Task<IDelayedException> TryExecuteAsync(IFunctionInstance instance, CancellationToken cancellationToken)
         {
-            using (CancellationTokenSource callCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(
-                _shutdownToken, cancellationToken))
+            using (CancellationTokenSource callCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(_shutdownToken, cancellationToken))
             {
                 return await _innerExecutor.TryExecuteAsync(instance, callCancellationSource.Token);
             }

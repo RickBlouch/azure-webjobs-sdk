@@ -24,12 +24,17 @@ namespace Microsoft.Azure.WebJobs.Host.Loggers
 
         public Task<string> LogFunctionStartedAsync(FunctionStartedMessage message, CancellationToken cancellationToken)
         {
-            string traceMessage = string.Format(CultureInfo.InvariantCulture, "Executing '{0}' (Reason='{1}', Id={2})", message.Function.ShortName, message.FormatReason(), message.FunctionInstanceId);
-            Log(LogLevel.Information, message.Function, message.FunctionInstanceId, traceMessage);
+            string name = message.Function.ShortName;
+            string reason = message.ReasonDetails ?? message.FormatReason();
+            var id = message.FunctionInstanceId;
+
+            Log(LogLevel.Information, message.Function, (s, e) => $"Executing '{name}' (Reason='{reason}', Id={id})");
+
             if (message.TriggerDetails != null && message.TriggerDetails.Count != 0)
             {
                 LogTemplatizedTriggerDetails(message);
             }
+
             return Task.FromResult<string>(null);
         }
 
@@ -38,6 +43,7 @@ namespace Microsoft.Azure.WebJobs.Host.Loggers
             var templateKeys = message.TriggerDetails.Select(entry => $"{entry.Key}: {{{entry.Key}}}");
             string messageTemplate = "Trigger Details: " + string.Join(", ", templateKeys);
             string[] templateValues = message.TriggerDetails.Values.ToArray();
+
             Log(LogLevel.Information, message.Function, messageTemplate, templateValues);
         }
 
@@ -49,24 +55,25 @@ namespace Microsoft.Azure.WebJobs.Host.Loggers
 
         public Task LogFunctionCompletedAsync(FunctionCompletedMessage message, CancellationToken cancellationToken)
         {
+            string name = message.Function.ShortName;
+            var id = message.FunctionInstanceId;
+
             if (message.Succeeded)
             {
-                string traceMessage = string.Format(CultureInfo.InvariantCulture, "Executed '{0}' (Succeeded, Id={1})", message.Function.ShortName, message.FunctionInstanceId);
-                Log(LogLevel.Information, message.Function, message.FunctionInstanceId, traceMessage);
+                Log(LogLevel.Information, message.Function, (s, e) => $"Executed '{name}' (Succeeded, Id={id})");
             }
             else
             {
-                string traceMessage = string.Format(CultureInfo.InvariantCulture, "Executed '{0}' (Failed, Id={1})", message.Function.ShortName, message.FunctionInstanceId);
-                Log(LogLevel.Error, message.Function, message.FunctionInstanceId, traceMessage, message.Failure.Exception);
+                Log(LogLevel.Error, message.Function, (s, e) => $"Executed '{name}' (Failed, Id={id})", message.Failure.Exception);
             }
 
             return Task.CompletedTask;
         }
 
-        private void Log(LogLevel level, FunctionDescriptor descriptor, Guid functionId, string message, Exception exception = null)
+        private void Log(LogLevel level, FunctionDescriptor descriptor, Func<string, Exception, string> formatter, Exception exception = null)
         {
             ILogger logger = _loggerFactory?.CreateLogger(LogCategories.CreateFunctionCategory(descriptor.LogName));
-            logger?.Log(level, 0, message, exception, (s, e) => s);
+            logger?.Log(level, 0, null, exception, formatter);
         }
 
         public Task DeleteLogFunctionStartedAsync(string startedMessageId, CancellationToken cancellationToken)

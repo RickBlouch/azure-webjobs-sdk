@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Azure.WebJobs.Host.Protocols;
+using Microsoft.Azure.WebJobs.Host.Triggers;
 
 namespace Microsoft.Azure.WebJobs.Host.Bindings
 {
@@ -25,40 +26,46 @@ namespace Microsoft.Azure.WebJobs.Host.Bindings
         // parameters takes precedence over existingBindingData.
         internal static BindingContext NewBindingContext(
             ValueBindingContext context, 
-            IReadOnlyDictionary<string, object> existingBindingData,  
+            ITriggerData triggerData,  
             IDictionary<string, object> parameters)
         {
-            // if bindingData was a mutable dictionary, we could just add it. 
-            // But since it's read-only, must create a new one. 
-            Dictionary<string, object> bindingData = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+            Func<IReadOnlyDictionary<string, object>> bindingDataFactory = () =>
+            {
+                IReadOnlyDictionary<string, object> existingBindingData = triggerData.BindingData;
 
-            var funcContext = context.FunctionContext;
-            var methodName = funcContext.MethodName;
-            
-            if (existingBindingData != null)
-            {
-                foreach (var kv in existingBindingData)
-                {
-                    bindingData[kv.Key] = kv.Value;
-                }
-            }
-            if (parameters != null)
-            {
-                foreach (var kv in parameters)
-                {
-                    bindingData[kv.Key] = kv.Value;
-                }
-            }
+                // if bindingData was a mutable dictionary, we could just add it. 
+                // But since it's read-only, must create a new one. 
+                Dictionary<string, object> bindingData = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
 
-            // Add 'sys' binding data. 
-            var sysBindingData = new SystemBindingData
-            {
-                MethodName = methodName
+                var funcContext = context.FunctionContext;
+                var methodName = funcContext.MethodName;
+
+                if (existingBindingData != null)
+                {
+                    foreach (var kv in existingBindingData)
+                    {
+                        bindingData[kv.Key] = kv.Value;
+                    }
+                }
+                if (parameters != null)
+                {
+                    foreach (var kv in parameters)
+                    {
+                        bindingData[kv.Key] = kv.Value;
+                    }
+                }
+
+                // Add 'sys' binding data. 
+                var sysBindingData = new SystemBindingData
+                {
+                    MethodName = methodName
+                };
+                sysBindingData.AddToBindingData(bindingData);
+
+                return bindingData;
             };
-            sysBindingData.AddToBindingData(bindingData);
 
-            BindingContext bindingContext = new BindingContext(context, bindingData);
-            return bindingContext;
+            return new BindingContext(context, bindingDataFactory);
         }
 
         public async Task<IReadOnlyDictionary<string, IValueProvider>> BindAsync(ValueBindingContext context, IDictionary<string, object> parameters)

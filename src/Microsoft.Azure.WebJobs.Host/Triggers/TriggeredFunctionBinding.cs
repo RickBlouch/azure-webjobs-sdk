@@ -48,15 +48,14 @@ namespace Microsoft.Azure.WebJobs.Host.Triggers
         private async Task<IReadOnlyDictionary<string, IValueProvider>> BindCoreAsync(ValueBindingContext context, object value, IDictionary<string, object> parameters)
         {
             Dictionary<string, IValueProvider> valueProviders = new Dictionary<string, IValueProvider>();
+            ITriggerData triggerData = null;
             IValueProvider triggerProvider;
-            IReadOnlyDictionary<string, object> bindingData;
 
             IValueBinder triggerReturnValueProvider= null;
             try
             {
-                ITriggerData triggerData = await _triggerBinding.BindAsync(value, context);
+                triggerData = await _triggerBinding.BindAsync(value, context);
                 triggerProvider = triggerData.ValueProvider;
-                bindingData = triggerData.BindingData;
                 triggerReturnValueProvider = (triggerData as TriggerData)?.ReturnValueProvider;
             }
             catch (OperationCanceledException)
@@ -66,7 +65,6 @@ namespace Microsoft.Azure.WebJobs.Host.Triggers
             catch (Exception exception)
             {
                 triggerProvider = new BindingExceptionValueProvider(_triggerParameterName, exception);
-                bindingData = null;
             }
 
             valueProviders.Add(_triggerParameterName, triggerProvider);
@@ -75,12 +73,12 @@ namespace Microsoft.Azure.WebJobs.Host.Triggers
             SingletonAttribute singletonAttribute = SingletonManager.GetFunctionSingletonOrNull(_descriptor, isTriggered: true);
             if (singletonAttribute != null)
             {
-                string boundScopeId = _singletonManager.GetBoundScopeId(singletonAttribute.ScopeId, bindingData);
+                string boundScopeId = _singletonManager.GetBoundScopeId(singletonAttribute.ScopeId, triggerData.BindingData);
                 IValueProvider singletonValueProvider = new SingletonValueProvider(_descriptor, boundScopeId, context.FunctionInstanceId.ToString(), singletonAttribute, _singletonManager);
                 valueProviders.Add(SingletonValueProvider.SingletonParameterName, singletonValueProvider);
             }
 
-            BindingContext bindingContext = FunctionBinding.NewBindingContext(context, bindingData, parameters);
+            BindingContext bindingContext = FunctionBinding.NewBindingContext(context, triggerData, parameters);
             foreach (KeyValuePair<string, IBinding> item in _nonTriggerBindings)
             {
                 string name = item.Key;
@@ -89,9 +87,9 @@ namespace Microsoft.Azure.WebJobs.Host.Triggers
 
                 try
                 {
-                    if (parameters != null && parameters.ContainsKey(name))
+                    if (parameters != null && parameters.TryGetValue(name, out object parameterValue))
                     {
-                        valueProvider = await binding.BindAsync(parameters[name], context);
+                        valueProvider = await binding.BindAsync(parameterValue, context);
                     }
                     else
                     {

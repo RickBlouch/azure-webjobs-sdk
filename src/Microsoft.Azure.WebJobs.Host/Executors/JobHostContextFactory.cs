@@ -126,7 +126,7 @@ namespace Microsoft.Azure.WebJobs.Host.Executors
                     executor.HostOutputMessage = hostOutputMessage;
                 }
 
-                IEnumerable<FunctionDescriptor> descriptors = functions.ReadAllDescriptors();
+                var descriptors = functions.ReadAllDescriptors();
                 int descriptorsCount = descriptors.Count();
 
                 ILogger startupLogger = _loggerFactory?.CreateLogger(LogCategories.Startup);
@@ -255,10 +255,10 @@ namespace Microsoft.Azure.WebJobs.Host.Executors
             IRecurrentCommand heartbeatCommand, IWebJobsExceptionHandler exceptionHandler,
             CancellationToken shutdownToken, IFunctionExecutor innerExecutor)
         {
-            IFunctionExecutor heartbeatExecutor = new HeartbeatFunctionExecutor(heartbeatCommand,
-                exceptionHandler, innerExecutor);
+            IFunctionExecutor heartbeatExecutor = new HeartbeatFunctionExecutor(heartbeatCommand, exceptionHandler, innerExecutor);
             IFunctionExecutor abortListenerExecutor = new AbortListenerFunctionExecutor(instanceQueueListenerFactory, heartbeatExecutor);
             IFunctionExecutor shutdownFunctionExecutor = new ShutdownFunctionExecutor(shutdownToken, abortListenerExecutor);
+
             return shutdownFunctionExecutor;
         }
 

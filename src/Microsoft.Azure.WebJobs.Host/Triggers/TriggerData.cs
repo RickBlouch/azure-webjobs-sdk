@@ -13,7 +13,8 @@ namespace Microsoft.Azure.WebJobs.Host.Triggers
     public class TriggerData : ITriggerData
     {
         private readonly IValueProvider _valueProvider;
-        private readonly IReadOnlyDictionary<string, object> _bindingData;
+        private readonly Func<IReadOnlyDictionary<string, object>> _bindingDataFactory;
+        private IReadOnlyDictionary<string, object> _bindingData;
 
         /// <summary>
         /// Creates a new instance. No ValueProvider used here since the converter pipeline will take care of it. 
@@ -21,8 +22,12 @@ namespace Microsoft.Azure.WebJobs.Host.Triggers
         /// <param name="bindingData"></param>
         public TriggerData(IReadOnlyDictionary<string, object> bindingData)
         {
-            _valueProvider = null;
             _bindingData = bindingData;
+        }
+
+        public TriggerData(Func<IReadOnlyDictionary<string, object>> bindingDataFactory)
+        {
+            _bindingDataFactory = bindingDataFactory;
         }
 
         /// <summary>
@@ -36,6 +41,12 @@ namespace Microsoft.Azure.WebJobs.Host.Triggers
             _bindingData = bindingData;
         }
 
+        public TriggerData(IValueProvider valueProvider, Func<IReadOnlyDictionary<string, object>> bindingDataFactory)
+        {
+            _valueProvider = valueProvider;
+            _bindingDataFactory = bindingDataFactory;
+        }
+
         /// <inheritdoc/>
         public IValueProvider ValueProvider
         {
@@ -45,7 +56,14 @@ namespace Microsoft.Azure.WebJobs.Host.Triggers
         /// <inheritdoc/>
         public IReadOnlyDictionary<string, object> BindingData
         {
-            get { return _bindingData; }
+            get 
+            { 
+                if (_bindingDataFactory != null && _bindingData == null)
+                {
+                    _bindingData = _bindingDataFactory();
+                }
+                return _bindingData; 
+            }
         }
 
         /// <summary>
